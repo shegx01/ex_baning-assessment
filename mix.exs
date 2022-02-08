@@ -23,8 +23,8 @@ defmodule ExBanking.MixProject do
   defp deps do
     [
       {:cachex, "~> 3.4"},
-       {:moneyex, "~> 0.1.1"},
-       {:gen_stage, "~> 1.1"},
+      {:moneyex, "~> 0.1.1"},
+      {:gen_stage, "~> 1.1"}
     ]
   end
 end

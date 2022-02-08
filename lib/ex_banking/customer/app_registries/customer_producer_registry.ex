@@ -1,5 +1,6 @@
-defmodule ExBanking.CustomerRegistry do
+defmodule ExBanking.CustomerProducerRegistry do
   alias ExBanking.Customer.Producer
+
   def start_link do
     Registry.start_link(keys: :unique, name: Producer)
   end

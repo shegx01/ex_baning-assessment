@@ -3,7 +3,6 @@ defmodule ExBanking.Application do
   # for more information on OTP Applications
   @moduledoc false
   alias ExBanking.Customer
-  alias ExBanking.Customer
 
   use Application
 
@@ -11,9 +10,10 @@ defmodule ExBanking.Application do
   def start(_type, _args) do
     children = [
       # map based supervisor
-     {Cachex, name: Customer.DataStore},
-     ExBanking.CustomerRegistry,
-     Customer.Supervisor,
+      {Cachex, name: Customer.DataStore},
+      ExBanking.CustomerProducerRegistry,
+      ExBanking.CustomerConsumerRegistry,
+      Customer.StagesDynamicSupervisor
     ]
 
     opts = [strategy: :one_for_one, name: ExBanking.Supervisor]
