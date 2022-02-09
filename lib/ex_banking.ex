@@ -20,7 +20,9 @@ defmodule ExBanking do
   """
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
   def create_user(name) when is_bitstring(name) do
-    StagesDynamicSupervisor.start_worker(name)
+    with :ok <- Customer.Transaction.validate_length(name) do
+      StagesDynamicSupervisor.start_worker(name)
+    end
   end
 
   def create_user(_), do: {:error, :wrong_arguments}

@@ -41,17 +41,26 @@ defmodule ExBanking.Customer.Producer do
   # communicating with `ExBanking` module for transaction struct creation
   # and calling calling queueing process
 
-  def create_transaction(%Transaction{user: user} = transaction) when not is_nil(user) do
+  def create_transaction(%Transaction{user: user, amount: amount, type: type} = transaction)
+      when not is_nil(user) do
     case worker_exists?(user) do
       true ->
-        GenStage.call(via_tuple(user), {:transaction, transaction})
+        case type do
+          :balance ->
+            GenStage.call(via_tuple(user), {:transaction, transaction})
+
+          _ ->
+            with :ok <- Transaction.validate_number(amount) do
+              GenStage.call(via_tuple(user), {:transaction, transaction})
+            end
+        end
 
       false ->
         {:error, :user_does_not_exist}
     end
   end
 
-  def create_transaction(%Transaction{from: from, to: to} = transaction) do
+  def create_transaction(%Transaction{from: from, to: to, amount: amount} = transaction) do
     case from == to do
       true ->
         {:error, :wrong_arguments}
@@ -60,8 +69,13 @@ defmodule ExBanking.Customer.Producer do
         case worker_exists?(from) do
           true ->
             case worker_exists?(to) do
-              true -> GenStage.call(via_tuple(from), {:transaction, transaction})
-              false -> {:error, :receiver_does_not_exist}
+              true ->
+                with :ok <- Transaction.validate_number(amount) do
+                  GenStage.call(via_tuple(from), {:transaction, transaction})
+                end
+
+              false ->
+                {:error, :receiver_does_not_exist}
             end
 
           false ->

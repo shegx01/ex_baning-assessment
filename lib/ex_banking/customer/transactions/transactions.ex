@@ -1,4 +1,8 @@
 defmodule ExBanking.Customer.Transaction do
+  @moduledoc """
+    Exchange abstraction representing a single transaction
+    in the code
+  """
   require Logger
   alias ExBanking.Customer.{DataStore, Producer}
   @type t :: %__MODULE__{}
@@ -27,6 +31,9 @@ defmodule ExBanking.Customer.Transaction do
             when is_bitstring(user) and is_number(amount) and amount >= 0 and
                    is_bitstring(currency)
 
+  @doc """
+    transaction validator for new/4
+  """
   @spec new(
           type :: atom(),
           user :: bitstring(),
@@ -35,8 +42,8 @@ defmodule ExBanking.Customer.Transaction do
         ) :: t()
   def new(type, user, amount, currency) when is_valid_deposit_withdraw(user, amount, currency) do
     with updated_fund <- amount,
-         true <- validate_length(user),
-         true <- validate_length(currency) do
+         :ok <- validate_length(user),
+         :ok <- validate_length(currency) do
       %Transaction{
         type: type,
         user: user,
@@ -51,8 +58,8 @@ defmodule ExBanking.Customer.Transaction do
   @spec new(balance :: atom(), user :: String.t(), currency :: String.t()) :: t()
   def new(:balance, user, currency)
       when is_bitstring(user) and is_bitstring(currency) do
-    with true <- validate_length(user),
-         true <- validate_length(currency) do
+    with :ok <- validate_length(user),
+         :ok <- validate_length(currency) do
       %Transaction{
         type: :balance,
         user: user,
@@ -72,10 +79,10 @@ defmodule ExBanking.Customer.Transaction do
         ) :: t()
   def new(:send, from_user, to_user, amount, currency)
       when is_bitstring(from_user) and is_bitstring(to_user) and is_bitstring(currency) and
-             amount > 0 do
-    with true <- validate_length(from_user),
-         true <- validate_length(to_user),
-         true <- validate_length(currency),
+             amount > 0 and not is_nil(amount) do
+    with :ok <- validate_length(from_user),
+         :ok <- validate_length(to_user),
+         :ok <- validate_length(currency),
          updated_fund <- amount do
       %Transaction{
         type: :send,
@@ -115,10 +122,9 @@ defmodule ExBanking.Customer.Transaction do
 
   def withdraw({:error, _} = error), do: error
 
-  @spec get_balance(transaction :: t()) :: Money.t()
+  @spec get_balance(transaction :: t()) :: {:ok, Money.t()}
   def get_balance(%Transaction{user: user, currency: currency}) do
-    {:ok, balance} = DataStore.get_account_balance({user, currency})
-    balance
+    DataStore.get_account_balance({user, currency})
   end
 
   def send_fund(%Transaction{from: from_user, to: to_user}) when from_user == to_user,
@@ -149,17 +155,16 @@ defmodule ExBanking.Customer.Transaction do
         case Producer.create_transaction(receiver_data) do
           {:ok, receiver_new_balance} ->
             {:ok, true} = sender_data |> DataStore.insert_customer_balance()
-            {:ok, Money.subtract(from_balance, amount), receiver_new_balance}
+            Logger.info("logging receiver balance")
+            IO.inspect(receiver_new_balance)
 
-          error ->
-            %{
-              transaction
-              | user: from_user,
-                amount: Money.add(from_balance, amount)
-            }
-            |> DataStore.insert_customer_balance()
+            {:ok, Money.subtract(from_balance, amount), receiver_new_balance |> input_to_money()}
 
-            error
+          _transaction_struct ->
+            # This is an error returned from transaction rollback
+            # from receiver
+
+            {:error, :tx_error_occured}
         end
 
       false ->
@@ -167,8 +172,19 @@ defmodule ExBanking.Customer.Transaction do
     end
   end
 
-  def validate_length(input) when is_bitstring(input), do: String.length(input) > 0
+  def validate_length(input) when is_bitstring(input) do
+    unless String.length(input) > 0 do
+      {:error, :wrong_arguments}
+    else
+      :ok
+    end
+  end
+
   def validate_length(_), do: {:error, :wrong_arguments}
+
+  def validate_number(%Money{}), do: :ok
+  def validate_number(input) when is_number(input) or is_float(input), do: :ok
+  def validate_number(_), do: {:error, :wrong_arguments}
 
   defp can_make_withdraw?(user_balance, amount) do
     case Money.subtract(user_balance, amount) |> Money.cmp(Money.new(0)) do
@@ -181,19 +197,27 @@ defmodule ExBanking.Customer.Transaction do
   def convert_fund_to_money(%Transaction{amount: amount} = transaction),
     do: %{transaction | amount: input_to_money(amount)}
 
-  defp input_to_money(user_input) do
+  def input_to_money(%Money{} = user_input) do
+    user_input
+  end
+
+  def input_to_money(user_input) do
     case Money.parse(user_input) do
       {:ok, money} -> money
       :error -> Money.new(0)
     end
   end
 
-  def format_fund_response({:ok, amount}), do: {:ok, Money.to_string(amount) |> String.to_float()}
+  def format_fund_response({:ok, %Money{} = amount}),
+    do: {:ok, Money.to_string(amount) |> String.to_float()}
 
-  def format_fund_response({:ok, sender_amount, receiver_amount}) do
+  def format_fund_response({:ok, %Money{} = sender_amount, %Money{} = receiver_amount}) do
     {:ok, Money.to_string(sender_amount) |> String.to_float(),
      Money.to_string(receiver_amount) |> String.to_float()}
   end
+
+  def format_fund_response(%Money{} = response),
+    do: response |> Money.to_string() |> String.to_float()
 
   def format_fund_response(response), do: response
 end

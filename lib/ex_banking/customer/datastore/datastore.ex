@@ -36,11 +36,6 @@ defmodule ExBanking.Customer.DataStore do
     end)
   end
 
-  @spec delete_customer_balance(account_name :: String.t()) :: {:ok, boolean()}
-  def delete_customer_balance(account_name) do
-    Cachex.del(@module, account_name)
-  end
-
   @spec get_account_balance(acount_name :: {String.t(), String.t()}) ::
           {:ok, Money.t()}
   def get_account_balance(account_name) do
