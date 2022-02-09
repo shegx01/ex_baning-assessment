@@ -3,28 +3,35 @@ defmodule ExBanking.Customer.Producer do
   alias ExBanking.Customer
   alias ExBanking.CustomerProducerRegistry
   alias ExBanking.Customer.{Transaction}
-  require Logger
 
   @moduledoc """
   - Managing job for each user as a Genstage
 
   """
+
+  @type transaction_queue :: :queue.queue({sender_id :: pid(), Transaction.t()})
+  @spec start_link(user :: String.t()) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(user) do
     GenStage.start_link(__MODULE__, 0, name: via_tuple(user))
   end
 
   @impl GenStage
-  def init(pending_demand) do
-    {:producer, {:queue.new(), pending_demand}}
+  @spec init(initial_demand :: non_neg_integer()) ::
+          {:producer, {:queue.queue({sender_pid :: pid()}), transaction :: Transaction.t()}}
+  def init(initial_demand) do
+    {:producer, {:queue.new(), initial_demand}}
   end
 
   defp via_tuple(worker_id) do
     CustomerProducerRegistry.via_tuple(worker_id)
   end
 
+  @spec get_pid(worker_id :: String.t()) :: nil | pid()
   def get_pid(worker_id) do
     Customer.StagesDynamicSupervisor.get_pid(:producer, worker_id)
   end
+
+  @spec worker_exists?(worker_id :: String.t()) :: boolean()
 
   defp worker_exists?(worker_id) do
     Customer.StagesDynamicSupervisor.worker_exists?(worker_id)
@@ -33,7 +40,7 @@ defmodule ExBanking.Customer.Producer do
   # Genstage server
   # communicating with `ExBanking` module for transaction struct creation
   # and calling calling queueing process
-  @spec create_transaction(any) :: {:error, atom()} | ExBanking.Customer.Transaction.t()
+
   def create_transaction(%Transaction{user: user} = transaction) when not is_nil(user) do
     case worker_exists?(user) do
       true ->
@@ -90,7 +97,7 @@ defmodule ExBanking.Customer.Producer do
         {queue, pending_demand}
       )
       when pending_demand > 0 do
-    case via_tuple(from) == self() do
+    case get_pid(from) == self() do
       true ->
         queue = enqueue_message(queue, {sender, transaction})
 
@@ -111,7 +118,7 @@ defmodule ExBanking.Customer.Producer do
         _sender,
         state
       ) do
-    case via_tuple(from) == self() do
+    case get_pid(from) == self() do
       true ->
         message = {:error, :too_many_requests_to_sender}
 
@@ -157,6 +164,13 @@ defmodule ExBanking.Customer.Producer do
   end
 
   @impl GenStage
+  @spec handle_info(
+          :new_transaction,
+          {:queue.queue({sender_pid :: pid(), Transaction.t()}),
+           pending_demand :: non_neg_integer()}
+        ) ::
+          {:noreply, list({sender_id :: pid(), Transaction.t()}),
+           {:queue.queue({sender_pid :: pid(), Transaction.t()}), non_neg_integer()}}
   def handle_info(:new_transaction, {queue, pending_demand}) do
     case :queue.out(queue) do
       {{:value, transaction}, queue} ->
@@ -167,5 +181,7 @@ defmodule ExBanking.Customer.Producer do
     end
   end
 
+  @spec enqueue_message(transaction_queue(), {sender_id :: pid(), Transaction.t()}) ::
+          transaction_queue()
   defp enqueue_message(queue, message), do: :queue.in(message, queue)
 end

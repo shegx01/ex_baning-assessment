@@ -1,6 +1,4 @@
 defmodule ExBanking.Customer.DataStore do
-  require Logger
-
   @moduledoc """
     Database for Customers in the system
     based on ets table
@@ -29,7 +27,7 @@ defmodule ExBanking.Customer.DataStore do
         {:ok, true} ->
           {:ok, value} = Cachex.get(worker, key)
           add_to_money(worker, key, value, amount)
-          {:ok, value + amount}
+          {:ok, Money.add(value, amount)}
 
         {:ok, false} ->
           Cachex.put(worker, key, amount)
@@ -43,10 +41,13 @@ defmodule ExBanking.Customer.DataStore do
     Cachex.del(@module, account_name)
   end
 
-  @spec get_account_balance(acount_name :: String.t()) ::
-          {:ok, neg_integer()} | {:error, :customer_not_found}
+  @spec get_account_balance(acount_name :: {String.t(), String.t()}) ::
+          {:ok, Money.t()}
   def get_account_balance(account_name) do
-    Cachex.get(@module, account_name)
+    case Cachex.get(@module, account_name) do
+      {:ok, nil} -> {:ok, Money.new(0)}
+      {:ok, balance} -> {:ok, balance}
+    end
   end
 
   @spec account_exists?(account_name :: String.t()) :: boolean()
@@ -56,7 +57,7 @@ defmodule ExBanking.Customer.DataStore do
   end
 
   defp add_to_money(worker, key, value, amount) do
-    Cachex.put(worker, key, value + amount)
-    {:ok, value + amount}
+    Cachex.put(worker, key, Money.add(value, amount))
+    {:ok, Money.add(value, amount)}
   end
 end

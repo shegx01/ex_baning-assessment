@@ -3,10 +3,12 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
   alias ExBanking.Customer
   alias ExBanking.Customer.{Producer, Consumer}
 
+  @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_) do
     DynamicSupervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
 
+  @spec start_worker(worker_id :: String.t()) :: :ok | {:error, any}
   def start_worker(worker_id) do
     case worker_exists?(worker_id) do
       true ->
@@ -24,7 +26,7 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
     |> ensure_worker_started()
   end
 
-  @spec worker_exists?(worker_id :: String.t()) :: boolean
+  @spec worker_exists?(worker_id :: String.t()) :: boolean()
   def worker_exists?(worker_id) do
     case Registry.lookup(Producer, worker_id) do
       [{_pid, _}] -> true

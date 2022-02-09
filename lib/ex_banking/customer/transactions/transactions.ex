@@ -1,6 +1,6 @@
 defmodule ExBanking.Customer.Transaction do
-  alias ExBanking.Customer.{DataStore, Producer}
   require Logger
+  alias ExBanking.Customer.{DataStore, Producer}
   @type t :: %__MODULE__{}
   alias __MODULE__
   defstruct [:type, :user, :amount, :from, :to, currency: 0]
@@ -93,7 +93,6 @@ defmodule ExBanking.Customer.Transaction do
           {:ok, integer} | deposit_withdraw_response()
 
   def deposit(%Transaction{} = transaction) do
-    Logger.info("depositing fund...")
     {:ok, balance} = DataStore.update_customer_balance(transaction)
     {:ok, balance}
   end
@@ -102,29 +101,24 @@ defmodule ExBanking.Customer.Transaction do
 
   @spec withdraw(transaction :: t()) :: deposit_withdraw_response()
   def withdraw(%Transaction{user: user, amount: amount, currency: currency} = transaction) do
-    case DataStore.get_account_balance({user, currency}) do
-      {:ok, nil} ->
-        {:error, :not_enough_money}
+    {:ok, current_fund} = DataStore.get_account_balance({user, currency})
 
-      {:ok, current_fund} ->
-        if can_make_withdraw?(current_fund, amount) do
-          updated_fund = Kernel.-(current_fund, amount)
-          customer_data = %{transaction | amount: updated_fund}
-          customer_data |> DataStore.insert_customer_balance()
-          {:ok, updated_fund}
-        else
-          {:error, :not_enough_money}
-        end
+    unless can_make_withdraw?(current_fund, amount) do
+      {:error, :not_enough_money}
+    else
+      updated_fund = Money.subtract(current_fund, amount)
+      customer_data = %{transaction | amount: updated_fund}
+      customer_data |> DataStore.insert_customer_balance()
+      {:ok, updated_fund}
     end
   end
 
   def withdraw({:error, _} = error), do: error
 
-  @spec get_balance(transaction :: t()) :: t()
+  @spec get_balance(transaction :: t()) :: Money.t()
   def get_balance(%Transaction{user: user, currency: currency}) do
     {:ok, balance} = DataStore.get_account_balance({user, currency})
-
-    {:ok, balance}
+    balance
   end
 
   def send_fund(%Transaction{from: from_user, to: to_user}) when from_user == to_user,
@@ -135,36 +129,71 @@ defmodule ExBanking.Customer.Transaction do
         %Transaction{from: from_user, to: to_user, currency: currency, amount: amount} =
           transaction
       ) do
-    case DataStore.get_account_balance({from_user, currency}) do
-      {:ok, nil} ->
-        {:error, :not_enough_money}
+    {:ok, from_balance} = DataStore.get_account_balance({from_user, currency})
 
-      {:ok, from_balance} ->
-        case can_make_withdraw?(from_balance, amount) do
-          true ->
-            sender_data = %{transaction | user: from_user, amount: from_balance - amount}
+    case can_make_withdraw?(from_balance, amount) do
+      true ->
+        sender_data = %{
+          transaction
+          | user: from_user,
+            amount: Money.subtract(from_balance, amount)
+        }
 
-            receiver_data = %Transaction{
-              type: :deposit,
-              user: to_user,
-              amount: amount,
-              currency: currency
+        receiver_data = %Transaction{
+          type: :deposit,
+          user: to_user,
+          amount: amount,
+          currency: currency
+        }
+
+        case Producer.create_transaction(receiver_data) do
+          {:ok, receiver_new_balance} ->
+            {:ok, true} = sender_data |> DataStore.insert_customer_balance()
+            {:ok, Money.subtract(from_balance, amount), receiver_new_balance}
+
+          error ->
+            %{
+              transaction
+              | user: from_user,
+                amount: Money.add(from_balance, amount)
             }
+            |> DataStore.insert_customer_balance()
 
-            with {:ok, true} <- sender_data |> DataStore.insert_customer_balance(),
-                 {:ok, receiver_new_balance} <- Producer.create_transaction(receiver_data) do
-              {:ok, from_balance - amount, receiver_new_balance}
-            end
-
-          false ->
-            {:error, :not_enough_money}
+            error
         end
+
+      false ->
+        {:error, :not_enough_money}
     end
   end
 
   def validate_length(input) when is_bitstring(input), do: String.length(input) > 0
   def validate_length(_), do: {:error, :wrong_arguments}
 
-  defp can_make_withdraw?(user_balance, amount) when user_balance - amount > 0, do: true
-  defp can_make_withdraw?(_user_balance, _amount), do: false
+  defp can_make_withdraw?(user_balance, amount) do
+    case Money.subtract(user_balance, amount) |> Money.cmp(Money.new(0)) do
+      :lt -> false
+      :gt -> true
+      :eq -> true
+    end
+  end
+
+  def convert_fund_to_money(%Transaction{amount: amount} = transaction),
+    do: %{transaction | amount: input_to_money(amount)}
+
+  defp input_to_money(user_input) do
+    case Money.parse(user_input) do
+      {:ok, money} -> money
+      :error -> Money.new(0)
+    end
+  end
+
+  def format_fund_response({:ok, amount}), do: {:ok, Money.to_string(amount) |> String.to_float()}
+
+  def format_fund_response({:ok, sender_amount, receiver_amount}) do
+    {:ok, Money.to_string(sender_amount) |> String.to_float(),
+     Money.to_string(receiver_amount) |> String.to_float()}
+  end
+
+  def format_fund_response(response), do: response
 end
