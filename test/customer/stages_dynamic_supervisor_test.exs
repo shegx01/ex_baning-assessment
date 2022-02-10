@@ -21,7 +21,7 @@ defmodule ExBanking.Customer.StagesDynamicSupervisorTest do
      assert {:ok, 200.0 } = ExBanking.deposit(user2, 200, "USD")
       assert {:error, :too_many_requests_to_user} = ExBanking.deposit(user, 20, "USD")
       assert {:error, :too_many_requests_to_user} = ExBanking.withdraw(user, 20, "USD")
-      assert {:error, :too_many_requests_to_user} = ExBanking.balance(user,"USD")
+      assert {:error, :too_many_requests_to_user} = ExBanking.balance(user, "USD")
       assert {:error, :too_many_requests_to_sender} = ExBanking.send(user, user2, 50, "USD")
       assert {:error, :too_many_requests_to_receiver} = ExBanking.send(user2, user, 50, "USD")
       assert {:ok, 200.0 } = ExBanking.balance(user2, "USD")

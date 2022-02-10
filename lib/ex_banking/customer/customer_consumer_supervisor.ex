@@ -1,4 +1,10 @@
 defmodule ExBanking.Customer.Consumer do
+  @moduledoc """
+  `ExBanking.Customer.Consumer` as a DynamicSupervisor starts its children
+   as sooon as it receives thems from  `ExBanking.Customer.StagesDynamicSupervisor`.
+   starts `ExBanking.Customer.Producer` to perform its works and shot them down when
+   they exit normal, Else restart another one if it fails
+  """
   use ConsumerSupervisor
   alias ExBanking.{CustomerProducerRegistry, CustomerConsumerRegistry}
   alias ExBanking.Customer.Worker

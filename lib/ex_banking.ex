@@ -42,7 +42,7 @@ defmodule ExBanking do
   end
 
   @spec balance(user :: String.t(), currency :: String.t()) ::
-          {:ok, balance :: number} | {:error, Atom.t()}
+          {:ok, balance :: number} | {:error, atom()}
   def balance(user, currency) do
     Customer.Transaction.new(:balance, user, currency)
     |> Customer.Producer.create_transaction()

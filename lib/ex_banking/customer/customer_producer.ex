@@ -63,11 +63,6 @@ defmodule ExBanking.Customer.Producer do
   end
 
   def create_transaction(%Transaction{from: from, to: to, amount: amount} = transaction) do
-    case from == to do
-      true ->
-        {:error, :wrong_arguments}
-
-      _ ->
         case worker_exists?(from) do
           true ->
             case worker_exists?(to) do
@@ -83,7 +78,6 @@ defmodule ExBanking.Customer.Producer do
           false ->
             {:error, :sender_does_not_exist}
         end
-    end
   end
 
   def create_transaction({:error, _} = error), do: error

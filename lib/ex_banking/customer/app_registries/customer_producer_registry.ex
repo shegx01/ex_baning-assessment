@@ -1,6 +1,10 @@
 defmodule ExBanking.CustomerProducerRegistry do
+  @moduledoc """
+   Registry Module for `ExBanking.Customer.Producer`
+   This enables us to find the worker process id from syncronous dispatch of transaction
+   and monitors our demand in its state
+  """
   alias ExBanking.Customer.Producer
-
   @spec start_link :: {:error, any} | {:ok, pid}
   def start_link do
     Registry.start_link(keys: :unique, name: Producer)

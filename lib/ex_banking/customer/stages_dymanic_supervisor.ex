@@ -1,4 +1,8 @@
 defmodule ExBanking.Customer.StagesDynamicSupervisor do
+  @moduledoc """
+  Supervisor responsible for starting `ExBanking.Customer.Producer` and `ExBanking.Customer.Consumer`
+  it receives the worker id from `ExBanking.create_user`
+  """
   use DynamicSupervisor
   alias ExBanking.Customer
   alias ExBanking.Customer.{Producer, Consumer}

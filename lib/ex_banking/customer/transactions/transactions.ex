@@ -82,6 +82,7 @@ defmodule ExBanking.Customer.Transaction do
     with :ok <- validate_length(from_user),
          :ok <- validate_length(to_user),
          :ok <- validate_length(currency),
+         :ok <- validate_send_users(from_user, to_user),
          updated_fund <- amount do
       %Transaction{
         type: :send,
@@ -109,13 +110,14 @@ defmodule ExBanking.Customer.Transaction do
   def withdraw(%Transaction{user: user, amount: amount, currency: currency} = transaction) do
     {:ok, current_fund} = DataStore.get_account_balance({user, currency})
 
-    unless can_make_withdraw?(current_fund, amount) do
-      {:error, :not_enough_money}
-    else
-      updated_fund = Money.subtract(current_fund, amount)
+    if can_make_withdraw?(current_fund, amount) do
+
+       updated_fund = Money.subtract(current_fund, amount)
       customer_data = %{transaction | amount: updated_fund}
       customer_data |> DataStore.insert_customer_balance()
       {:ok, updated_fund}
+    else
+  {:error, :not_enough_money}
     end
   end
 
@@ -152,18 +154,16 @@ defmodule ExBanking.Customer.Transaction do
           send_deposit: true
         }
 
-        with {:ok, true} <- sender_data |> DataStore.insert_customer_balance()
-              do
-                case  receiver_data |> Producer.create_transaction() do
-                  {:ok, receiver_fund}  ->
-                     {:ok, Money.subtract(from_balance, amount), receiver_fund |> input_to_money()}
-                  error ->
-                    DataStore.update_customer_balance(%{sender_data | amount: amount})
+        with {:ok, true} <- sender_data |> DataStore.insert_customer_balance() do
+          case receiver_data |> Producer.create_transaction() do
+            {:ok, receiver_fund} ->
+              {:ok, Money.subtract(from_balance, amount), receiver_fund |> input_to_money()}
 
-                    error
-                end
+            error ->
+              DataStore.update_customer_balance(%{sender_data | amount: amount})
 
-
+              error
+          end
         end
 
       false ->
@@ -172,14 +172,18 @@ defmodule ExBanking.Customer.Transaction do
   end
 
   def validate_length(input) when is_bitstring(input) do
-    unless String.length(input) > 0 do
-      {:error, :wrong_arguments}
-    else
+    if String.length(input) > 0 do
       :ok
+    else
+      {:error, :wrong_arguments}
     end
   end
 
   def validate_length(_), do: {:error, :wrong_arguments}
+
+
+  def validate_send_users(arg1, arg2) when arg1 === arg2, do: {:error, :wrong_arguments}
+  def validate_send_users(_arg1, _arg2), do: :ok
 
   def validate_number(%Money{}), do: :ok
   def validate_number(input) when is_number(input) or is_float(input), do: :ok
