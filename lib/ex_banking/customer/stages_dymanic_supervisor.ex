@@ -11,7 +11,6 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
   def start_link(_) do
     DynamicSupervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
-
   @spec start_worker(worker_id :: String.t()) :: :ok | {:error, any}
   def start_worker(worker_id, initial_demand \\ 0) do
     case worker_exists?(worker_id) do
