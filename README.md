@@ -6,6 +6,11 @@ Specification here [Elixir Test](https://github.com/coingaming/elixir-test)
 The system process transactions amoung the customers
 created and uniquely identified by the system
 
+## Why use [GenStage](https://hexdocs.pm/gen_stage/GenStage.html) [ConsumerSupervisor](https://hexdocs.pm/gen_stage/ConsumerSupervisor.html#content) ?
+
+GenStage is fantastic in handling processing pipelines with backpressure support.
+The advantage of using Genstage is that we have no worry about handling queuing processes and de-queueing them, monitoring the data that child process is processing when they exit. Although we had to synchronize the producer and consumer with ConsumerSupervisor, we do have not to bother ourselves about performance for  Consumer being a single process because ConsumerSupervisor will manage multiple workers up to the maximum demand we set.
+
 ## Clone the repository
 
 ```bash
@@ -64,4 +69,4 @@ mix docs
 
 ### made and a lot of things has changed since it was initally made but the overview
 
-### remains still the same.
+### remains still the same
