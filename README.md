@@ -56,6 +56,6 @@ mix docs
 mix docs
 ``` -->
 
-## System Architecture mini overview
+## System Design Flow Diagram 
 
 ![ExBanking Arch Mini](https://user-images.githubusercontent.com/42073367/153485477-11a67cc4-656c-45a1-b4cb-c97fd55700fb.svg)
