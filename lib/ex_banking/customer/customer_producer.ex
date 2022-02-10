@@ -1,4 +1,5 @@
 defmodule ExBanking.Customer.Producer do
+  require Logger
   use GenStage
   alias ExBanking.Customer
   alias ExBanking.CustomerProducerRegistry
@@ -10,9 +11,10 @@ defmodule ExBanking.Customer.Producer do
   """
 
   @type transaction_queue :: :queue.queue({sender_id :: pid(), Transaction.t()})
-  @spec start_link(user :: String.t()) :: :ignore | {:error, any} | {:ok, pid}
-  def start_link(user) do
-    GenStage.start_link(__MODULE__, 0, name: via_tuple(user))
+  @spec start_link({user :: String.t(), initial_demand :: integer()}) ::
+          :ignore | {:error, any} | {:ok, pid}
+  def start_link({user, inittial_demand}) do
+    GenStage.start_link(__MODULE__, inittial_demand, name: via_tuple(user))
   end
 
   @impl GenStage
@@ -106,43 +108,38 @@ defmodule ExBanking.Customer.Producer do
 
   @impl GenStage
   def handle_call(
-        {:transaction, %Transaction{type: :send, from: from, to: _to} = transaction},
+        {:transaction, %Transaction{type: :send} = transaction},
         sender,
         {queue, pending_demand}
       )
       when pending_demand > 0 do
-    case get_pid(from) == self() do
-      true ->
-        queue = enqueue_message(queue, {sender, transaction})
+    queue = enqueue_message(queue, {sender, transaction})
 
-        # we would not want to handle transaction here
-        # so lets delegate the work it to handle_info/2
-        Process.send(self(), :new_transaction, [])
-        {:noreply, [], {queue, pending_demand - 1}}
-
-      false ->
-        queue = enqueue_message(queue, {sender, transaction})
-        Process.send(self(), :new_transaction, [])
-        {:noreply, [], {queue, pending_demand - 1}}
-    end
+    # we would not want to handle transaction here
+    # so lets delegate the work it to handle_info/2
+    Process.send(self(), :new_transaction, [])
+    {:noreply, [], {queue, pending_demand - 1}}
   end
 
   def handle_call(
-        {:transaction, %Transaction{type: :send, from: from, to: _to}},
+        {:transaction,
+        %Transaction{type: :send}},
         _sender,
         state
-      ) do
-    case get_pid(from) == self() do
-      true ->
+      )
+      do
         message = {:error, :too_many_requests_to_sender}
 
         {:reply, message, [], state}
+  end
 
-      false ->
-        message = {:error, :too_many_requests_to_receiver}
+  def handle_call({:transaction, %Transaction{type: :deposit, send_deposit: true}}, _sender, {_, pending_state} = state)
+  when pending_state <= 0
 
-        {:reply, message, [], state}
-    end
+  do
+    message = {:error, :too_many_requests_to_receiver}
+
+    {:reply, message, [], state}
   end
 
   def handle_call({:transaction, transaction}, sender, {queue, pending_demand})
@@ -153,6 +150,7 @@ defmodule ExBanking.Customer.Producer do
     Process.send(self(), :new_transaction, [])
     {:noreply, [], {queue, pending_demand - 1}}
   end
+
 
   def handle_call({:transaction, _transaction}, _sender, state) do
     message = {:error, :too_many_requests_to_user}

@@ -3,11 +3,10 @@ defmodule ExBanking.Customer.Transaction do
     Exchange abstraction representing a single transaction
     in the code
   """
-  require Logger
   alias ExBanking.Customer.{DataStore, Producer}
   @type t :: %__MODULE__{}
   alias __MODULE__
-  defstruct [:type, :user, :amount, :from, :to, currency: 0]
+  defstruct [:type, :user, :amount, :from, :to, currency: 0, send_deposit: false]
 
   @type deposit_withdraw_response ::
           {:ok, new_balance :: number}
@@ -149,22 +148,22 @@ defmodule ExBanking.Customer.Transaction do
           type: :deposit,
           user: to_user,
           amount: amount,
-          currency: currency
+          currency: currency,
+          send_deposit: true
         }
 
-        case Producer.create_transaction(receiver_data) do
-          {:ok, receiver_new_balance} ->
-            {:ok, true} = sender_data |> DataStore.insert_customer_balance()
-            Logger.info("logging receiver balance")
-            IO.inspect(receiver_new_balance)
+        with {:ok, true} <- sender_data |> DataStore.insert_customer_balance()
+              do
+                case  receiver_data |> Producer.create_transaction() do
+                  {:ok, receiver_fund}  ->
+                     {:ok, Money.subtract(from_balance, amount), receiver_fund |> input_to_money()}
+                  error ->
+                    DataStore.update_customer_balance(%{sender_data | amount: amount})
 
-            {:ok, Money.subtract(from_balance, amount), receiver_new_balance |> input_to_money()}
+                    error
+                end
 
-          _transaction_struct ->
-            # This is an error returned from transaction rollback
-            # from receiver
 
-            {:error, :tx_error_occured}
         end
 
       false ->

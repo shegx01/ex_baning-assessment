@@ -16,6 +16,7 @@ defmodule ExBanking.Customer.TransactionTest do
     }
   end
 
+
   describe "new/1" do
     test "success: type: :deposit" do
       assert %Transaction{} = Transaction.new(:deposit, "James", 20, "USD")

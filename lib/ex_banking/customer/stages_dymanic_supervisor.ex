@@ -9,13 +9,13 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
   end
 
   @spec start_worker(worker_id :: String.t()) :: :ok | {:error, any}
-  def start_worker(worker_id) do
+  def start_worker(worker_id, initial_demand \\ 0) do
     case worker_exists?(worker_id) do
       true ->
         {:error, :user_already_exists}
 
       false ->
-        case start_child_producer(worker_id) do
+        case start_child_producer({worker_id, initial_demand}) do
           {:ok, _} ->
             start_child_consumer(worker_id)
 

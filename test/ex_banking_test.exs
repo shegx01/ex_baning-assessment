@@ -99,6 +99,8 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} == nil |> ExBanking.send(user2, 40, "CAD")
       assert {:error, :wrong_arguments} == user1 |> ExBanking.send(user2, nil, "CAD")
       assert {:error, :wrong_arguments} == user1 |> ExBanking.send(user2, 21, nil)
+      assert {:ok, 200.0, 200.0} == user2 |> ExBanking.send(user1, 200, "USD")
+
     end
   end
 end

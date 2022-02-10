@@ -6,8 +6,6 @@ defmodule ExBanking.Customer.Worker do
 
   """
   def start_link({sender, transaction}) do
-    IO.inspect(transaction, label: "args")
-
     Task.start_link(fn ->
       response = transaction |> make_transaction()
       GenStage.reply(sender, response |> Transaction.format_fund_response())
