@@ -63,9 +63,10 @@ mix docs
 
 ## System Design Flow Diagram
 
-![ExBanking Arch Mini](https://user-images.githubusercontent.com/42073367/153485477-11a67cc4-656c-45a1-b4cb-c97fd55700fb.svg)
+![ExBanking Arch Mini](https://user-images.githubusercontent.com/42073367/153496372-a2421dd7-b889-425e-9a65-c0b0e03c93c8.svg)
 
-### `NOTE:` Do not take the above disgram as a gospel, it was roughly
+
+### `NOTE:` The above diagram is for illustration purpose only, it was roughly
 
 ### made and a lot of things has changed since it was initally made but the overview
 
