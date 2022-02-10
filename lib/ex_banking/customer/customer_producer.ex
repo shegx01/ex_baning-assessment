@@ -1,38 +1,87 @@
 defmodule ExBanking.Customer.Producer do
-  use GenStage
-  alias ExBanking.CustomerRegistry
-  alias ExBanking.Customer.Transaction
   require Logger
+  use GenStage
+  alias ExBanking.Customer
+  alias ExBanking.CustomerProducerRegistry
+  alias ExBanking.Customer.{Transaction}
 
-  def start_link(user) do
-    GenStage.start_link(__MODULE__, 0, name: via_tuple(user))
+  @moduledoc """
+  - Managing job for each user as a Genstage
+
+  """
+
+  @type transaction_queue :: :queue.queue({sender_id :: pid(), Transaction.t()})
+  @spec start_link({user :: String.t(), initial_demand :: integer()}) ::
+          :ignore | {:error, any} | {:ok, pid}
+  def start_link({user, inittial_demand}) do
+    GenStage.start_link(__MODULE__, inittial_demand, name: via_tuple(user))
   end
 
   @impl GenStage
-  def init(pending_demand) do
-    {:producer, {:queue.new(), pending_demand}}
+  @spec init(initial_demand :: non_neg_integer()) ::
+          {:producer, {:queue.queue({sender_pid :: pid()}), transaction :: Transaction.t()}}
+  def init(initial_demand) do
+    {:producer, {:queue.new(), initial_demand}}
   end
 
-  def via_tuple(worker_id) do
-    CustomerRegistry.via_tuple(worker_id)
+  defp via_tuple(worker_id) do
+    CustomerProducerRegistry.via_tuple(worker_id)
   end
 
-  # genstage server
+  @spec get_pid(worker_id :: String.t()) :: nil | pid()
+  def get_pid(worker_id) do
+    Customer.StagesDynamicSupervisor.get_pid(:producer, worker_id)
+  end
+
+  @spec worker_exists?(worker_id :: String.t()) :: boolean()
+
+  defp worker_exists?(worker_id) do
+    Customer.StagesDynamicSupervisor.worker_exists?(worker_id)
+  end
+
+  # Genstage server
   # communicating with `ExBanking` module for transaction struct creation
   # and calling calling queueing process
-  @spec create_transaction(any) :: {:error, any} | ExBanking.Customer.Transaction.t()
-  def create_transaction(%Transaction{type: :send, from: user} = transaction) do
-    Logger.info("transaction of type :send")
-    GenStage.call(via_tuple(user), {:verify_transaction, transaction})
+
+  def create_transaction(%Transaction{user: user, amount: amount, type: type} = transaction)
+      when not is_nil(user) do
+    case worker_exists?(user) do
+      true ->
+        case type do
+          :balance ->
+            GenStage.call(via_tuple(user), {:transaction, transaction})
+
+          _ ->
+            with :ok <- Transaction.validate_number(amount) do
+              GenStage.call(via_tuple(user), {:transaction, transaction})
+            end
+        end
+
+      false ->
+        {:error, :user_does_not_exist}
+    end
   end
 
-  def create_transaction(%Transaction{user: user} = transaction) do
-    Logger.info("generic transactions")
-    GenStage.call(via_tuple(user), {:transaction, transaction})
+  def create_transaction(%Transaction{from: from, to: to, amount: amount} = transaction) do
+        case worker_exists?(from) do
+          true ->
+            case worker_exists?(to) do
+              true ->
+                with :ok <- Transaction.validate_number(amount) do
+                  GenStage.call(via_tuple(from), {:transaction, transaction})
+                end
+
+              false ->
+                {:error, :receiver_does_not_exist}
+            end
+
+          false ->
+            {:error, :sender_does_not_exist}
+        end
   end
 
   def create_transaction({:error, _} = error), do: error
-  def create_transaction(_), do: {:error, :wrong_argument}
+  def create_transaction(_), do: {:error, :wrong_arguments}
 
   @doc """
     CONSTRAINT 1
@@ -40,7 +89,7 @@ defmodule ExBanking.Customer.Producer do
 
    - I manually managing queueing process and pending transaction demand
      we dont want to push to the system if max 10 active event is in the system.
-   - since we manage the queue, the pending demand must be 0 and max demand must be 10
+   - since we manage the queue, the `pending_demand` must be 0 and max demand     must be 10
      to guarantee this rule
      so the demand from the consumer must have been satisfied if current pending demand is
      equal to 0 in this producer module
@@ -52,9 +101,13 @@ defmodule ExBanking.Customer.Producer do
   """
 
   @impl GenStage
-  def handle_call({:transaction, transaction}, sender, {queue, pending_demand})
+  def handle_call(
+        {:transaction, %Transaction{type: :send} = transaction},
+        sender,
+        {queue, pending_demand}
+      )
       when pending_demand > 0 do
-    queue = :queue.in({sender, transaction}, queue)
+    queue = enqueue_message(queue, {sender, transaction})
 
     # we would not want to handle transaction here
     # so lets delegate the work it to handle_info/2
@@ -62,35 +115,44 @@ defmodule ExBanking.Customer.Producer do
     {:noreply, [], {queue, pending_demand - 1}}
   end
 
-  def handle_call({:transaction, _transaction}, _sender, {queue, pending_demand}) do
+  def handle_call(
+        {:transaction,
+        %Transaction{type: :send}},
+        _sender,
+        state
+      )
+      do
+        message = {:error, :too_many_requests_to_sender}
+
+        {:reply, message, [], state}
+  end
+
+  def handle_call({:transaction, %Transaction{type: :deposit, send_deposit: true}}, _sender, {_, pending_state} = state)
+  when pending_state <= 0
+
+  do
+    message = {:error, :too_many_requests_to_receiver}
+
+    {:reply, message, [], state}
+  end
+
+  def handle_call({:transaction, transaction}, sender, {queue, pending_demand})
+      when pending_demand > 0 do
+    queue = enqueue_message(queue, {sender, transaction})
+    # we would not want to handle transaction here
+    # so lets delegate the work it to handle_info/2
+    Process.send(self(), :new_transaction, [])
+    {:noreply, [], {queue, pending_demand - 1}}
+  end
+
+
+  def handle_call({:transaction, _transaction}, _sender, state) do
     message = {:error, :too_many_requests_to_user}
 
-    {:reply, message, [], {queue, pending_demand}}
+    {:reply, message, [], state}
   end
 
-
-    #  validating the constraint of :too_many_requests_to_sender and :too_many_requests_to_sender
-
-  def handle_call(
-        {:verify_transaction, %Transaction{from: from, to: to} = transaction},
-        sender,
-        state
-      ) do
-    verify_send_transaction(transaction, from, to, sender, state)
-  end
-
-  @impl GenStage
-  def handle_info(:new_transaction, {queue, pending_demand}) do
-    case :queue.out(queue) do
-      {{:value, transaction}, queue} ->
-        {:noreply, [transaction], {queue, pending_demand}}
-
-      {:empty, queue} ->
-        # :queue needs reverse to enable FIFO behavious
-        # no performance penalty on such a data
-        {:noreply, [], {Enum.reverse(queue), pending_demand}}
-    end
-  end
+  #  validating the constraint of :too_many_requests_to_sender and :too_many_requests_to_sender
 
   # handing demand
   # minimum number of demand expected is 1
@@ -103,28 +165,29 @@ defmodule ExBanking.Customer.Producer do
         {:noreply, [transaction], {queue, demand + pending_demand - 1}}
 
       {:empty, queue} ->
-        {:noreply, [], {Enum.reverse(queue), demand + pending_demand}}
+        {:noreply, [], {queue, demand + pending_demand}}
     end
   end
 
+  @impl GenStage
+  @spec handle_info(
+          :new_transaction,
+          {:queue.queue({sender_pid :: pid(), Transaction.t()}),
+           pending_demand :: non_neg_integer()}
+        ) ::
+          {:noreply, list({sender_id :: pid(), Transaction.t()}),
+           {:queue.queue({sender_pid :: pid(), Transaction.t()}), non_neg_integer()}}
+  def handle_info(:new_transaction, {queue, pending_demand}) do
+    case :queue.out(queue) do
+      {{:value, transaction}, queue} ->
+        {:noreply, [transaction], {queue, pending_demand}}
 
-  defp verify_send_transaction(transaction, from, to, sender, {_, pending_demand} = state) do
-    case sender == self() do
-      true ->
-        if pending_demand > 0 do
-          GenStage.call(via_tuple(to), {:verify_transaction, transaction})
-        else
-          message = {:error, :too_many_requests_to_sender}
-          {:reply, message, [], state}
-        end
-
-      false ->
-        if pending_demand > 0 do
-          GenStage.call(via_tuple(from), {:transaction, transaction})
-        else
-          message = {:error, :too_many_requests_to_receiver}
-          {:reply, message, [], state}
-        end
+      {:empty, queue} ->
+        {:noreply, [], {queue, pending_demand}}
     end
   end
+
+  @spec enqueue_message(transaction_queue(), {sender_id :: pid(), Transaction.t()}) ::
+          transaction_queue()
+  defp enqueue_message(queue, message), do: :queue.in(message, queue)
 end

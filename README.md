@@ -1,21 +1,24 @@
 # ExBanking
 
-**TODO: Add description**
+Exercise by YOLO TEAM
 
-## Installation
+The system process transactions amoung the customers
+created and uniquely identified by the system
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `ex_banking` to your list of dependencies in `mix.exs`:
+## Clone the repository
 
-```elixir
-def deps do
-  [
-    {:ex_banking, "~> 0.1.0"}
-  ]
-end
+```bash
+  git clone https://github.com/shegx01/ex_banking excercise.git
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/ex_banking](https://hexdocs.pm/ex_banking).
+## Install Dependencies
 
+```bash
+mix do deps.get
+```
+
+## Perform test and cover
+
+```bash
+mix test cover
+```
