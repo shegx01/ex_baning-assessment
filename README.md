@@ -9,7 +9,7 @@ created and uniquely identified by the system
 ## Clone the repository
 
 ```bash
-  git clone [ex_banking excercise](https://github.com/shegx01/ex_banking-assessment.git)
+  git clone https://github.com/shegx01/ex_banking-assessment.git
 ```
 
 ## Install Dependencies
