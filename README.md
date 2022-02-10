@@ -1,6 +1,6 @@
 # ExBanking
 
-ExBanking Exercise by for YOLO TEAM Elixir Developer 
+ExBanking Exercise by for YOLO TEAM Elixir Developer
 Specification here [Elixir Test](https://github.com/coingaming/elixir-test)
 
 The system process transactions amoung the customers
@@ -24,6 +24,12 @@ mix do deps.get
 mix test --cover
 ```
 
+## Generate Documentation/Specification
+
+```bash
+mix docs
+```
+
 ### DESIGN CHOICES
 
 - Empty string type is considered a wrong input.
@@ -41,7 +47,3 @@ mix test --cover
 ## Supervision Tree View
 
 ![Supervision Tree](https://user-images.githubusercontent.com/42073367/153446938-0d5dab99-e552-4d7f-b7fb-6b005da13917.svg)
-
-## System Architechture
-
-<!-- TODO -->
