@@ -56,6 +56,12 @@ mix docs
 mix docs
 ``` -->
 
-## System Design Flow Diagram 
+## System Design Flow Diagram
 
 ![ExBanking Arch Mini](https://user-images.githubusercontent.com/42073367/153485477-11a67cc4-656c-45a1-b4cb-c97fd55700fb.svg)
+
+### `NOTE:` Do not take the above disgram as a gospel, it was roughly
+
+### made and a lot of things has changed since it was initally made but the overview
+
+### is still the same
