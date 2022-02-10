@@ -29,6 +29,8 @@ defmodule ExBankingTest do
       assert {:error, :wrong_arguments} == user |> ExBanking.deposit(nil, "USD")
       assert {:error, :wrong_arguments} == user |> ExBanking.deposit(20.0, "")
       assert {:error, :wrong_arguments} == user |> ExBanking.deposit('"', "")
+      assert {:ok, amount} = user |> ExBanking.deposit(2000000, "USD")
+      assert amount >= 2000000
     end
   end
 

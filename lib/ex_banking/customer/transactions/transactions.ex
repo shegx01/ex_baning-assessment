@@ -2,6 +2,8 @@ defmodule ExBanking.Customer.Transaction do
   @moduledoc """
     Exchange abstraction representing a single transaction
     in the code
+    Validating the Transaction and return appropriate errors.
+    These module communicate directly ith `ExBanking.Customer.DataStore`
   """
   alias ExBanking.Customer.{DataStore, Producer}
   @type t :: %__MODULE__{}
@@ -31,7 +33,8 @@ defmodule ExBanking.Customer.Transaction do
                    is_bitstring(currency)
 
   @doc """
-    transaction validator for new/4
+    transaction validator and Data exchange for new/4
+    returns appropriate errors if failed validation
   """
   @spec new(
           type :: atom(),
@@ -96,16 +99,25 @@ defmodule ExBanking.Customer.Transaction do
 
   def new(_, _, _, _, _), do: {:error, :wrong_arguments}
 
+
+  @doc """
+    Handles depositing fund to user's account
+    Calls DataStore directly
+  """
+
   @spec deposit(transaction :: ExBanking.Customer.Transaction.t()) ::
           {:ok, integer} | deposit_withdraw_response()
 
   def deposit(%Transaction{} = transaction) do
-    {:ok, balance} = DataStore.update_customer_balance(transaction)
-    {:ok, balance}
+     DataStore.update_customer_balance(transaction)
   end
 
   def deposit({:error, _} = error), do: error
 
+  @doc """
+    withdraw fund directly from user account.
+    only returns error when not enough fund in the user account
+  """
   @spec withdraw(transaction :: t()) :: deposit_withdraw_response()
   def withdraw(%Transaction{user: user, amount: amount, currency: currency} = transaction) do
     {:ok, current_fund} = DataStore.get_account_balance({user, currency})
@@ -123,6 +135,12 @@ defmodule ExBanking.Customer.Transaction do
 
   def withdraw({:error, _} = error), do: error
 
+  @doc """
+    returns the balance from user account.
+    if user has no fund, it return the currency specified after saving it and
+    return the money as 0
+  """
+
   @spec get_balance(transaction :: t()) :: {:ok, Money.t()}
   def get_balance(%Transaction{user: user, currency: currency}) do
     DataStore.get_account_balance({user, currency})
@@ -131,6 +149,10 @@ defmodule ExBanking.Customer.Transaction do
   def send_fund(%Transaction{from: from_user, to: to_user}) when from_user == to_user,
     do: {:error, :wrong_arguments}
 
+    @doc """
+      send money from an account to another account
+      performs rollback should an error occured and returns the error
+    """
   @spec send_fund(transaction :: t()) :: send_response()
   def send_fund(
         %Transaction{from: from_user, to: to_user, currency: currency, amount: amount} =
@@ -171,6 +193,10 @@ defmodule ExBanking.Customer.Transaction do
     end
   end
 
+  @doc """
+    validates string length
+    returns `:ok` or {:error, :wrong_arguments}
+  """
   def validate_length(input) when is_bitstring(input) do
     if String.length(input) > 0 do
       :ok
@@ -182,9 +208,18 @@ defmodule ExBanking.Customer.Transaction do
   def validate_length(_), do: {:error, :wrong_arguments}
 
 
+  @doc """
+    validates if sender and receiver are the same
+    return `:ok` or {:error, :wrong_arguments}
+  """
   def validate_send_users(arg1, arg2) when arg1 === arg2, do: {:error, :wrong_arguments}
   def validate_send_users(_arg1, _arg2), do: :ok
 
+  @doc """
+    validate the number input into the system
+    only float ar float is allowed as money
+  """
+  @spec validate_number(any) :: :ok | {:error, :wrong_arguments}
   def validate_number(%Money{}), do: :ok
   def validate_number(input) when is_number(input) or is_float(input), do: :ok
   def validate_number(_), do: {:error, :wrong_arguments}
@@ -197,6 +232,9 @@ defmodule ExBanking.Customer.Transaction do
     end
   end
 
+  @doc """
+    converts user input to money type `Money.t()`
+  """
   def convert_fund_to_money(%Transaction{amount: amount} = transaction),
     do: %{transaction | amount: input_to_money(amount)}
 
@@ -211,6 +249,10 @@ defmodule ExBanking.Customer.Transaction do
     end
   end
 
+  @doc """
+    convert user response back to float amount in 2 precision
+    default for money type
+  """
   def format_fund_response({:ok, %Money{} = amount}),
     do: {:ok, Money.to_string(amount) |> String.to_float()}
 

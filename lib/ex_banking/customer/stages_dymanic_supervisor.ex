@@ -2,6 +2,8 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
   @moduledoc """
   Supervisor responsible for starting `ExBanking.Customer.Producer` and `ExBanking.Customer.Consumer`
   it receives the worker id from `ExBanking.create_user`
+
+  Provides functionality for checking the started children identifier (pid) and checking their existence too
   """
   use DynamicSupervisor
   alias ExBanking.Customer
@@ -11,6 +13,15 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
   def start_link(_) do
     DynamicSupervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
+
+  @doc """
+    Called by `ExBanking.create_user`
+    and returns :ok | {:error, :user_already_exists}
+
+    The initial_demand here as the initial argument supplied to start_child_producer
+    which then set as the initial value for our producer
+    This pattern is important for testing the returns of GenStage producers' handle_call
+  """
   @spec start_worker(worker_id :: String.t()) :: :ok | {:error, any}
   def start_worker(worker_id, initial_demand \\ 0) do
     case worker_exists?(worker_id) do
@@ -29,6 +40,10 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
     |> ensure_worker_started()
   end
 
+  @doc """
+    Check worker existence.
+    Returns true if found in the Registry or false otherwise
+  """
   @spec worker_exists?(worker_id :: String.t()) :: boolean()
   def worker_exists?(worker_id) do
     case Registry.lookup(Producer, worker_id) do
@@ -37,6 +52,10 @@ defmodule ExBanking.Customer.StagesDynamicSupervisor do
     end
   end
 
+  @doc """
+    Returns the process identifier for the producer or the consumer
+    
+  """
   @spec get_pid(registry_id :: atom(), worker_id :: String.t()) :: pid() | nil
   def get_pid(registry_id, worker_id), do: do_get_pid(registry_id, worker_id)
 
