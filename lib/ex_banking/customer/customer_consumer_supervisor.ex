@@ -1,9 +1,12 @@
 defmodule ExBanking.Customer.Consumer do
   @moduledoc """
-  `ExBanking.Customer.Consumer` as a DynamicSupervisor starts its children
+  `ExBanking.Customer.Consumer` as a DynamicSupervisor, starts its children
    as sooon as it receives thems from  `ExBanking.Customer.StagesDynamicSupervisor`.
-   starts `ExBanking.Customer.Producer` to perform its works and shot them down when
-   they exit normal, Else restart another one if it fails
+   Then asks the source `ExBanking.Customer.Producer` for work to do.
+   The default requested is set by @max_demand module attribute.
+    `ExBanking.Customer.Producer` then receives the work from worker `ExBanking.Customer.Worker`
+    which then shut itself down after completing the work.
+    Should any ork fails, This Consumer reclaims it to the :queue
   """
   use ConsumerSupervisor
   alias ExBanking.{CustomerProducerRegistry, CustomerConsumerRegistry}

@@ -39,9 +39,14 @@ defmodule ExBanking.Customer.Producer do
     Customer.StagesDynamicSupervisor.worker_exists?(worker_id)
   end
 
-  # Genstage server
-  # communicating with `ExBanking` module for transaction struct creation
-  # and calling calling queueing process
+  @doc """
+    # Genstage server
+    # communicating with `ExBanking` module for transaction struct creation
+    # and calling calling GenStage queueing process
+    # also Validation of worker process existence happens here
+    # cause of boundary invalidation
+
+  """
 
   def create_transaction(%Transaction{user: user, amount: amount, type: type} = transaction)
       when not is_nil(user) do
@@ -63,21 +68,21 @@ defmodule ExBanking.Customer.Producer do
   end
 
   def create_transaction(%Transaction{from: from, to: to, amount: amount} = transaction) do
-        case worker_exists?(from) do
+    case worker_exists?(from) do
+      true ->
+        case worker_exists?(to) do
           true ->
-            case worker_exists?(to) do
-              true ->
-                with :ok <- Transaction.validate_number(amount) do
-                  GenStage.call(via_tuple(from), {:transaction, transaction})
-                end
-
-              false ->
-                {:error, :receiver_does_not_exist}
+            with :ok <- Transaction.validate_number(amount) do
+              GenStage.call(via_tuple(from), {:transaction, transaction})
             end
 
           false ->
-            {:error, :sender_does_not_exist}
+            {:error, :receiver_does_not_exist}
         end
+
+      false ->
+        {:error, :sender_does_not_exist}
+    end
   end
 
   def create_transaction({:error, _} = error), do: error
@@ -116,21 +121,21 @@ defmodule ExBanking.Customer.Producer do
   end
 
   def handle_call(
-        {:transaction,
-        %Transaction{type: :send}},
+        {:transaction, %Transaction{type: :send}},
         _sender,
         state
-      )
-      do
-        message = {:error, :too_many_requests_to_sender}
+      ) do
+    message = {:error, :too_many_requests_to_sender}
 
-        {:reply, message, [], state}
+    {:reply, message, [], state}
   end
 
-  def handle_call({:transaction, %Transaction{type: :deposit, send_deposit: true}}, _sender, {_, pending_state} = state)
-  when pending_state <= 0
-
-  do
+  def handle_call(
+        {:transaction, %Transaction{type: :deposit, send_deposit: true}},
+        _sender,
+        {_, pending_state} = state
+      )
+      when pending_state <= 0 do
     message = {:error, :too_many_requests_to_receiver}
 
     {:reply, message, [], state}
@@ -144,7 +149,6 @@ defmodule ExBanking.Customer.Producer do
     Process.send(self(), :new_transaction, [])
     {:noreply, [], {queue, pending_demand - 1}}
   end
-
 
   def handle_call({:transaction, _transaction}, _sender, state) do
     message = {:error, :too_many_requests_to_user}
