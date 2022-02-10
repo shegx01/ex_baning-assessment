@@ -34,6 +34,8 @@ mix docs
 
 - Empty string type is considered a wrong input.
 
+- if sender is the same as receiver, an error is returned
+
 - Internally, Money is handled by [Money Hex Package](https://hexdocs.pm/money/readme.html).
 
 - `USER` is regarded as `ExBanking.Customer`.
@@ -46,4 +48,10 @@ mix docs
 
 ## Supervision Tree View
 
-![Supervision Tree](https://user-images.githubusercontent.com/42073367/153446938-0d5dab99-e552-4d7f-b7fb-6b005da13917.svg)
+![Supervision Tree](https://user-images.githubusercontent.com/42073367/153468694-9beff593-30fd-4fe4-aba3-ac5e37f1e479.svg)
+
+### See modules inside after generate the docs using
+
+```bash
+mix docs
+```
