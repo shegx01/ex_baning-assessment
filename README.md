@@ -64,4 +64,4 @@ mix docs
 
 ### made and a lot of things has changed since it was initally made but the overview
 
-### remains still the same
+### remains still the same.
