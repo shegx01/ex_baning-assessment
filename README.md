@@ -49,9 +49,13 @@ mix docs
 ## Supervision Tree View
 
 ![Supervision Tree](https://user-images.githubusercontent.com/42073367/153468694-9beff593-30fd-4fe4-aba3-ac5e37f1e479.svg)
-
+<!-- 
 ### See modules inside after generate the docs using
 
 ```bash
 mix docs
-```
+``` -->
+
+## System Architecture mini overview
+
+![ExBanking Arch Mini](https://user-images.githubusercontent.com/42073367/153485477-11a67cc4-656c-45a1-b4cb-c97fd55700fb.svg)
