@@ -60,15 +60,3 @@ mix docs
 ```bash
 mix docs
 ``` -->
-
-## System Design Flow Diagram
-
-![ExBanking Arch Mini](https://user-images.githubusercontent.com/42073367/153496372-a2421dd7-b889-425e-9a65-c0b0e03c93c8.svg)
-
-
-### `NOTE:` The above diagram is for illustration purpose only, some processes and 
-## compoonents has been removed for simplicity sake.
-
-### a lot of things has changed since it was first made but the overview
-
-### remains still the same
