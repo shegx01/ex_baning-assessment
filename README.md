@@ -41,15 +41,21 @@ mix docs
 
 - if sender is the same as receiver, an error is returned
 
-- Internally, Money is handled by [Money Hex Package](https://hexdocs.pm/money/readme.html).
+- Internally, Money is handled by [Money Hex Package](https://hexdocs.pm/money/readme.html) so float overflow will not happen to user funds.
+
+- Transactions are rolled back should the receiver transaction fails to go through
+
+- Each `USER` is represented by a GenStage `Producer` and `ConsumerSupervisor` so that transactions are managed individually.
+  
+- No Performance Bottleneck from sending more work to `USER` because `ConsumerSupervisor` only manages the events and works are being done in another process by monitored `Elixir TASK` module
+
+- Work cannot be lost due to `ConsumerSupervisor` monitors the state of the worker and restarts the job should they fails.
 
 - `USER` is regarded as `ExBanking.Customer`.
 
 - `Transactions` is handled and manipulated by `ExBanking.Customer.Transaction`. This module is responsible for validation, and communication between `USER` and `STORE`.
 
-- `USER Transactions` is represented as a pair of event that is to happen in the system.
-
-- Events are represented by `GenStage`
+- `USER Transactions` is represented as a pair of event that is to happening in the system.
 
 ## Supervision Tree View
 
