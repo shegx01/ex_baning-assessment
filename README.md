@@ -47,7 +47,7 @@ mix docs
 
 - Each `USER` is represented by a GenStage `Producer` and `ConsumerSupervisor` so that transactions are managed individually.
   
-- No Performance Bottleneck from sending more work to `USER` because `ConsumerSupervisor` only manages the events and works are being done in another process by monitored `Elixir TASK` module
+- No Performance Bottleneck from sending more work to `USER` because `ConsumerSupervisor` only manages the events and works are being done in another monitored process by `Elixir TASK`  via `ExBanking.Customer.Worker` module
 
 - Work cannot be lost due to `ConsumerSupervisor` monitors the state of the worker and restarts the job should they fails.
 
@@ -55,7 +55,7 @@ mix docs
 
 - `Transactions` is handled and manipulated by `ExBanking.Customer.Transaction`. This module is responsible for validation, and communication between `USER` and `STORE`.
 
-- `USER Transactions` is represented as a pair of event that is to happening in the system.
+- `USER Transactions` is represented by a struct that serve as an exchange medium `%ExBanking.Customer.Tranasction{}` between the source `ExBanking.Customer.Producer` and the sink `ExBanking.Customer.Consumer`
 
 ## Supervision Tree View
 
